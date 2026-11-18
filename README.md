@@ -12,10 +12,8 @@
 Once `detect-server.sh` has been added to this repository, run it on a Linux server with:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/USERNAME/detect-server/main/detect-server.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/alokgame2009-bot/detect-server/main/detect-server.sh)
 ```
-
-Replace `USERNAME` with your GitHub username.
 
 
 **Powered by Zyren Tech**
