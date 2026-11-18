@@ -4,8 +4,6 @@
 **Footer:** Powered by Zyren Tech  
 **Repository:** `detect-server`
 
-Original upstream script:
-https://raw.githubusercontent.com/hopingboyz/linux/main/detect-server.sh
 
 > The upstream script could not be retrieved while preparing this package. This repository starter does not include or reproduce the original script. Review the source before running it.
 
