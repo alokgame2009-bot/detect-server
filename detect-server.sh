@@ -1,184 +1,356 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# ============================================================
-# Zyren Tech Server Detector
-# Author: Zyren
-# Powered by Zyren Tech
-# ============================================================
+# ==========================================================
+# Advanced Server Detection v3.0
+# No external packages required
+# Supports:
+# Bare Metal
+# KVM
+# QEMU
+# VMware
+# Hyper-V
+# Xen
+# VirtualBox
+# OpenVZ
+# LXC
+# Docker
+# Podman
+# Proxmox
+# OpenStack
+# EC2
+# Google Cloud
+# Azure
+# VPS / VDS Estimation
+# ==========================================================
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 WHITE='\033[1;37m'
-RESET='\033[0m'
+NC='\033[0m'
 
-clear 2>/dev/null
+clear
 
-get_dmi() {
-    for file in "$@"; do
-        if [ -r "$file" ]; then
-            cat "$file" 2>/dev/null
-            return
-        fi
-    done
-    echo "Unknown"
+banner() {
+echo -e "${CYAN}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "               SERVER DETECTOR v3.0"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${NC}"
 }
 
-# Virtualization Detection
-VIRT=$(systemd-detect-virt 2>/dev/null || echo "none")
+banner
 
-# Hardware Information
-SYS_VENDOR=$(get_dmi /sys/class/dmi/id/sys_vendor)
-PRODUCT_NAME=$(get_dmi /sys/class/dmi/id/product_name)
-PRODUCT_VERSION=$(get_dmi /sys/class/dmi/id/product_version)
+HOSTNAME=$(hostname 2>/dev/null)
 
-# Cloud Provider Detection
-DMI_INFO="${SYS_VENDOR} ${PRODUCT_NAME} ${PRODUCT_VERSION}"
+OS=$(
+grep '^PRETTY_NAME=' /etc/os-release 2>/dev/null |
+cut -d'"' -f2
+)
 
-if echo "$DMI_INFO" | grep -qi "Amazon\|EC2"; then
-    PROVIDER="Amazon AWS"
-elif echo "$DMI_INFO" | grep -qi "Google"; then
-    PROVIDER="Google Cloud"
-elif echo "$DMI_INFO" | grep -qi "Microsoft\|Virtual Machine"; then
-    PROVIDER="Microsoft Azure / Hyper-V"
-elif echo "$DMI_INFO" | grep -qi "Oracle"; then
-    PROVIDER="Oracle Cloud"
-elif echo "$DMI_INFO" | grep -qi "Alibaba"; then
-    PROVIDER="Alibaba Cloud"
-elif echo "$DMI_INFO" | grep -qi "DigitalOcean"; then
-    PROVIDER="DigitalOcean"
-elif echo "$DMI_INFO" | grep -qi "Hetzner"; then
-    PROVIDER="Hetzner"
-elif echo "$DMI_INFO" | grep -qi "VMware"; then
-    PROVIDER="VMware"
-elif echo "$DMI_INFO" | grep -qi "QEMU"; then
-    PROVIDER="QEMU/KVM"
-else
-    PROVIDER="Unknown / Private Provider"
-fi
+[ -z "$OS" ] && OS=$(uname -o)
 
-# Server Type Detection
-case "$VIRT" in
-    docker|podman|lxc|lxc-libvirt|openvz|systemd-nspawn)
-        SERVER_TYPE="Container"
-        ;;
-    kvm|qemu|vmware|xen|microsoft|oracle|bhyve|parallels)
-        SERVER_TYPE="Virtual Server (VPS/VDS)"
-        ;;
-    none)
-        SERVER_TYPE="Physical Server / Bare Metal"
-        ;;
-    *)
-        SERVER_TYPE="Virtualized Server"
-        ;;
-esac
-
-# Operating System
-OS_NAME="Unknown"
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    OS_NAME="$PRETTY_NAME"
-fi
-
-# CPU
-CPU=$(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d ':' -f2 | xargs)
-
-if [ -z "$CPU" ]; then
-    CPU=$(uname -p)
-fi
-
-CPU_CORES=$(nproc 2>/dev/null || echo "Unknown")
-CPU_THREADS=$(grep -c processor /proc/cpuinfo 2>/dev/null)
-
-# RAM
-RAM_TOTAL=$(free -h | awk '/Mem:/ {print $2}')
-RAM_USED=$(free -h | awk '/Mem:/ {print $3}')
-RAM_FREE=$(free -h | awk '/Mem:/ {print $4}')
-
-# Disk
-DISK_TOTAL=$(df -h / | awk 'NR==2 {print $2}')
-DISK_USED=$(df -h / | awk 'NR==2 {print $3}')
-DISK_FREE=$(df -h / | awk 'NR==2 {print $4}')
-DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}')
-
-# IP
-IP_ADDRESS=$(hostname -I 2>/dev/null | awk '{print $1}')
-[ -z "$IP_ADDRESS" ] && IP_ADDRESS="Unavailable"
-
-# Hostname
-HOSTNAME=$(hostname)
-
-# Kernel
 KERNEL=$(uname -r)
 
-# Architecture
-ARCH=$(uname -m)
+CPU_MODEL=$(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^ *//')
+CPU_CORES=$(nproc 2>/dev/null)
 
-# Uptime
-UPTIME=$(uptime -p 2>/dev/null)
+RAM=$(free -h | awk '/^Mem:/ {print $2}')
+DISK=$(df -h / | awk 'NR==2 {print $2}')
 
-# ============================================================
-# OUTPUT
-# ============================================================
+PRODUCT_NAME=$(cat /sys/class/dmi/id/product_name 2>/dev/null)
+SYS_VENDOR=$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)
+BOARD_NAME=$(cat /sys/class/dmi/id/board_name 2>/dev/null)
 
-echo -e "${CYAN}"
-echo "============================================================"
-echo "             ZYREN TECH SERVER DETECTOR"
-echo "============================================================"
-echo -e "${RESET}"
+DMI_INFO="$(echo "$PRODUCT_NAME $SYS_VENDOR $BOARD_NAME" | tr '[:upper:]' '[:lower:]')"
 
-echo -e "${GREEN}[ SERVER CLASSIFICATION ]${RESET}"
-echo -e "${WHITE}Server Type       :${RESET} $SERVER_TYPE"
-echo -e "${WHITE}Virtualization    :${RESET} $VIRT"
-echo -e "${WHITE}Provider          :${RESET} $PROVIDER"
-echo -e "${WHITE}System Vendor     :${RESET} $SYS_VENDOR"
-echo -e "${WHITE}Product Name      :${RESET} $PRODUCT_NAME"
+SCORE=0
 
-echo ""
+# ==========================================================
+# Virtualization Detection
+# ==========================================================
 
-echo -e "${GREEN}[ SYSTEM INFORMATION ]${RESET}"
-echo -e "${WHITE}Hostname          :${RESET} $HOSTNAME"
-echo -e "${WHITE}Operating System  :${RESET} $OS_NAME"
-echo -e "${WHITE}Kernel            :${RESET} $KERNEL"
-echo -e "${WHITE}Architecture      :${RESET} $ARCH"
-echo -e "${WHITE}IP Address        :${RESET} $IP_ADDRESS"
-echo -e "${WHITE}Uptime            :${RESET} $UPTIME"
+VIRT="none"
 
-echo ""
+if command -v systemd-detect-virt >/dev/null 2>&1; then
+    VIRT=$(systemd-detect-virt 2>/dev/null)
+fi
 
-echo -e "${GREEN}[ CPU INFORMATION ]${RESET}"
-echo -e "${WHITE}Processor         :${RESET} $CPU"
-echo -e "${WHITE}CPU Cores         :${RESET} $CPU_CORES"
-echo -e "${WHITE}CPU Threads       :${RESET} $CPU_THREADS"
+# Docker fallback
 
-echo ""
+if [ -f /.dockerenv ]; then
+    VIRT="docker"
+fi
 
-echo -e "${GREEN}[ MEMORY INFORMATION ]${RESET}"
-echo -e "${WHITE}Total RAM         :${RESET} $RAM_TOTAL"
-echo -e "${WHITE}Used RAM          :${RESET} $RAM_USED"
-echo -e "${WHITE}Free RAM          :${RESET} $RAM_FREE"
+# LXC fallback
 
-echo ""
+if grep -qa container=lxc /proc/1/environ 2>/dev/null; then
+    VIRT="lxc"
+fi
 
-echo -e "${GREEN}[ DISK INFORMATION ]${RESET}"
-echo -e "${WHITE}Total Disk        :${RESET} $DISK_TOTAL"
-echo -e "${WHITE}Used Disk         :${RESET} $DISK_USED"
-echo -e "${WHITE}Free Disk         :${RESET} $DISK_FREE"
-echo -e "${WHITE}Disk Usage        :${RESET} $DISK_USAGE"
+# OpenVZ
 
-echo ""
+if [ -d /proc/vz ] && [ ! -d /proc/bc ]; then
+    VIRT="openvz"
+fi
 
-echo -e "${YELLOW}[ DETECTION NOTE ]${RESET}"
-echo "VPS and VDS both use virtualization."
-echo "Exact resource allocation cannot always be detected"
-echo "from inside the operating system."
+# ==========================================================
+# Server Type
+# ==========================================================
 
-echo ""
+SERVER_TYPE="Unknown"
 
-echo -e "${CYAN}"
-echo "============================================================"
-echo "              Powered by Zyren Tech"
-echo "                   Author: Zyren"
-echo "============================================================"
-echo -e "${RESET}"
+case "$VIRT" in
+
+docker)
+SERVER_TYPE="Docker Container"
+;;
+
+lxc)
+SERVER_TYPE="LXC Container"
+;;
+
+podman)
+SERVER_TYPE="Podman Container"
+;;
+
+openvz)
+SERVER_TYPE="OpenVZ Container"
+;;
+
+kvm)
+SERVER_TYPE="KVM VPS"
+;;
+
+qemu)
+SERVER_TYPE="QEMU VPS"
+;;
+
+vmware)
+SERVER_TYPE="VMware VM"
+;;
+
+xen)
+SERVER_TYPE="Xen VPS"
+;;
+
+oracle)
+SERVER_TYPE="VirtualBox VM"
+;;
+
+microsoft)
+SERVER_TYPE="Hyper-V VPS"
+;;
+
+amazon)
+SERVER_TYPE="Amazon EC2"
+;;
+
+google)
+SERVER_TYPE="Google Cloud VM"
+;;
+
+none)
+SERVER_TYPE="Bare Metal Server"
+;;
+
+*)
+SERVER_TYPE="$VIRT"
+;;
+
+esac
+
+# ==========================================================
+# Machine Type Detection
+# ==========================================================
+
+MACHINE_TYPE="Unknown"
+
+case "$DMI_INFO" in
+
+*q35*)
+MACHINE_TYPE="Q35"
+;;
+
+*i440fx*)
+MACHINE_TYPE="i440FX"
+;;
+
+*kvm*)
+MACHINE_TYPE="KVM"
+;;
+
+*qemu*)
+MACHINE_TYPE="QEMU"
+;;
+
+*vmware*)
+MACHINE_TYPE="VMware"
+;;
+
+*virtualbox*)
+MACHINE_TYPE="VirtualBox"
+;;
+
+*xen*)
+MACHINE_TYPE="Xen"
+;;
+
+*hyper-v*|*microsoft*)
+MACHINE_TYPE="Hyper-V"
+;;
+
+*proxmox*)
+MACHINE_TYPE="Proxmox"
+;;
+
+*openstack*)
+MACHINE_TYPE="OpenStack"
+;;
+
+*amazon*)
+MACHINE_TYPE="Amazon EC2"
+;;
+
+*google*)
+MACHINE_TYPE="Google Cloud"
+;;
+
+*azure*)
+MACHINE_TYPE="Microsoft Azure"
+;;
+
+*)
+if [ "$VIRT" != "none" ]; then
+    MACHINE_TYPE=$(echo "$VIRT" | tr '[:lower:]' '[:upper:]')
+fi
+;;
+
+esac
+
+# ==========================================================
+# Hypervisor
+# ==========================================================
+
+HYPERVISOR="Bare Metal"
+
+if grep -qi hypervisor /proc/cpuinfo; then
+    HYPERVISOR="Detected"
+    SCORE=$((SCORE+2))
+fi
+
+# ==========================================================
+# VPS / VDS Estimation
+# ==========================================================
+
+ASSESSMENT="Unknown"
+
+case "$VIRT" in
+
+docker|lxc|podman|openvz)
+ASSESSMENT="Container"
+;;
+
+none)
+ASSESSMENT="Bare Metal"
+;;
+
+*)
+if echo "$CPU_MODEL" | grep -qi "epyc"; then
+    SCORE=$((SCORE+2))
+fi
+
+if echo "$CPU_MODEL" | grep -qi "xeon"; then
+    SCORE=$((SCORE+1))
+fi
+
+if [ "$CPU_CORES" -ge 8 ]; then
+    SCORE=$((SCORE+1))
+fi
+
+if grep -qi hypervisor /proc/cpuinfo; then
+    SCORE=$((SCORE+1))
+fi
+
+if [ "$SCORE" -ge 4 ]; then
+    ASSESSMENT="VDS"
+else
+    ASSESSMENT="VPS"
+fi
+;;
+
+esac
+
+# ==========================================================
+# Output
+# ==========================================================
+
+echo -e "${WHITE}Hostname       :${NC} $HOSTNAME"
+echo -e "${WHITE}Operating Sys  :${NC} $OS"
+echo -e "${WHITE}Kernel         :${NC} $KERNEL"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+echo -e "${WHITE}Server Type    :${NC} $SERVER_TYPE"
+echo -e "${WHITE}Virtualization :${NC} $VIRT"
+echo -e "${WHITE}Machine Type   :${NC} $MACHINE_TYPE"
+
+echo
+echo -e "${WHITE}Product Name   :${NC} ${PRODUCT_NAME:-Unknown}"
+echo -e "${WHITE}System Vendor  :${NC} ${SYS_VENDOR:-Unknown}"
+echo -e "${WHITE}Board Name     :${NC} ${BOARD_NAME:-Unknown}"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+echo -e "${WHITE}CPU Model      :${NC} $CPU_MODEL"
+echo -e "${WHITE}CPU Cores      :${NC} $CPU_CORES"
+echo -e "${WHITE}RAM            :${NC} $RAM"
+echo -e "${WHITE}Disk Size      :${NC} $DISK"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+case "$ASSESSMENT" in
+
+Container)
+echo -e "${BLUE}Environment    : Container${NC}"
+;;
+
+Bare\ Metal)
+echo -e "${GREEN}Environment    : Bare Metal${NC}"
+;;
+
+VDS)
+echo -e "${GREEN}Environment    : VDS${NC}"
+;;
+
+VPS)
+echo -e "${YELLOW}Environment    : VPS${NC}"
+;;
+
+*)
+echo -e "${WHITE}Environment    : Unknown${NC}"
+;;
+
+esac
+
+echo
+echo -e "${WHITE}Detection Score:${NC} $SCORE"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+if [ "$ASSESSMENT" = "Bare Metal" ]; then
+    echo -e "${GREEN}RESULT:${NC} Bare Metal Server"
+elif [ "$ASSESSMENT" = "Container" ]; then
+    echo -e "${BLUE}RESULT:${NC} Container Environment"
+else
+    echo -e "${CYAN}RESULT:${NC} $ASSESSMENT ($SERVER_TYPE)"
+fi
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo
