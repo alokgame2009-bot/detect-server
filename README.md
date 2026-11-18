@@ -17,15 +17,5 @@ bash <(curl -fsSL https://raw.githubusercontent.com/USERNAME/detect-server/main/
 
 Replace `USERNAME` with your GitHub username.
 
-## Fetch upstream for review
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/hopingboyz/linux/main/detect-server.sh -o detect-server.sh
-less detect-server.sh
-```
-
-Do not execute scripts from the internet without reviewing them first.
-
----
 
 **Powered by Zyren Tech**
